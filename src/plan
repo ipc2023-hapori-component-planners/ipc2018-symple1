@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -e
+
+BASEDIR="$(dirname "$0")"
+echo $(dirname "$0")
+
+function die {
+    echo "$@" 1>&2
+    exit 1
+}
+
+function usage {
+    die "usage: $(basename "$0") [DOMAIN_FILE] PROBLEM_FILE H2TIMELIMIT SEARCH_OPTION ..."
+}
+
+# Paths to planner components
+TRANSLATE="$BASEDIR/translate/translate.py"
+PREPROCESS="$BASEDIR/preprocess/preprocess"
+SEARCH="$BASEDIR/search/downward"
+
+# Need to explicitly ask for GNU time (from MacPorts) on Mac OS X.
+if [[ "$(uname)" == "Darwin" ]]; then
+    TIME="gtime"
+    if ! which $TIME >/dev/null; then
+        die "$TIME must be installed on Mac OSX (from MacPorts, perhaps) for this to work"
+    fi
+else
+    TIME="command time"
+fi
+
+TIME="$TIME --output=elapsed.time --format=%S\n%U\n"
+
+if [[ "$#" < 2 ]]; then
+    usage
+fi
+
+echo "1. Running translator"
+echo "$TRANSLATE" "$1" "$2"
+$TIME "$TRANSLATE" "$1" "$2"
+echo
+
+echo "2. Running preprocessor"
+echo "$PREPROCESS" < output.sas "--h2_time_limit" "$3"
+$TIME --append "$PREPROCESS" < output.sas "--h2_time_limit" "$3"
+echo
+shift 3
+
+echo "3. Running search"
+echo "$SEARCH" < output "$@"
+"$SEARCH" < output "$@"
+echo

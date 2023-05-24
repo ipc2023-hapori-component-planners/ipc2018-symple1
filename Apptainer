@@ -1,0 +1,61 @@
+# Stage 1: Compile the planner
+Bootstrap: docker
+From: ubuntu:bionic
+Stage: build
+
+%files
+    .
+
+%post
+    ## Install all necessary dependencies.
+    apt-get update
+    apt-get -y install --no-install-recommends cmake g++ make python automake autoconf libtool flex bison
+
+    ## Build your planner
+    ./build -j4
+
+# Stage 2: Run the planner
+Bootstrap: docker
+From: ubuntu:bionic
+Stage: run
+
+# Copy planner binary and required files from Stage 1.
+%files from build
+    plan /planner/plan
+    src/plan /planner/src/plan
+    src/plan-ipc-18 /planner/src/plan-ipc-18
+    src/translate/ /planner/src/translate/
+    src/preprocess/preprocess /planner/src/preprocess/preprocess
+    src/search/dispatch /planner/src/search/dispatch
+    src/search/downward* /planner/src/search/
+    src/search/unitcost /planner/src/search/unitcost
+
+%post
+    ## Install only dependencies for running the planner.
+    apt-get update
+    apt-get -y install --no-install-recommends python-minimal time gawk
+    ## Remove unnecessary files to keep the image small.
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    ## The runscript is called whenever the container is used to solve
+    ## an instance.
+
+    DOMAINFILE=$1
+    PROBLEMFILE=$2
+    PLANFILE=$3
+    CONFIG=$4
+    H2TIMELIMIT=$5
+
+    ## Call your planner.
+    /planner/src/plan $DOMAINFILE $PROBLEMFILE $H2TIMELIMIT ipc-18 $CONFIG --plan-file $PLANFILE
+
+## Update the following fields with meta data about your submission.
+## Please use the same field names and use only one line for each value.
+%labels
+Name        Symple-1
+Description Symple performs a bidirectional A* search based on Edge-Valued Multi-Valued Decision Diagrams (EVMDDs).
+Authors     David Speck, Florian Geißer and Robert Mattmüller <speckd,geisserf,mattmuel>@informatik.uni-freiburg.de
+SupportsDerivedPredicates no
+SupportsQuantifiedPreconditions no
+SupportsQuantifiedEffects no
